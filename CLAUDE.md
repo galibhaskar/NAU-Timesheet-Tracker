@@ -121,10 +121,18 @@ Agent tool → model: "opus" | "sonnet" | "haiku"
 1. PM reviews phase plan → approves
 2. Agents dispatched (parallel where independent)
 3. Each agent: read spec → implement → verify → return result
-4. PM reviews output → updates team-work-log.md
-5. Git commit per phase completion
-6. Push to galibhaskar/NAU-Timesheet-Tracker
+4. Claude presents a DETAILED DEMO to PM:
+   - Show all files created/modified with key code sections
+   - Walk through the feature end-to-end (API calls, UI flows, data models)
+   - Highlight design decisions, trade-offs, and anything non-obvious
+   - List any known gaps or deferred items
+5. PM reviews demo → requests changes OR approves
+6. If changes requested: implement feedback → re-demo → wait for approval
+7. ONLY after explicit PM approval: commit + push to galibhaskar/NAU-Timesheet-Tracker
 ```
+
+> **RULE: Never commit or push code without explicit PM approval.**
+> Always say "Awaiting your approval before committing." at the end of each demo.
 
 ### Agent Dispatch Rules
 - **Parallel**: Agents working on non-overlapping files can run simultaneously
@@ -133,13 +141,24 @@ Agent tool → model: "opus" | "sonnet" | "haiku"
 - **Background**: Use `run_in_background: true` for all parallel agents; foreground only when you need results before proceeding
 
 ### Git Strategy
-- Commit after every phase (or major sub-phase) completion
+- **Never commit or push without PM approval** — demo first, commit after approval
+- Commit after every phase (or major sub-phase) completion, once PM approves
 - Use descriptive commit messages referencing the agent and phase:
   ```
   Phase 1: Development Agent — session API endpoints with server-authoritative timing
   ```
 - Push to `origin/main` after each phase. Always push workflow files only after `workflow` scope is granted (`gh auth refresh -s workflow`)
 - Never force push to main
+
+### Demo Format
+When presenting a phase demo to PM, structure it as:
+1. **Summary** — What was built, which agents completed work
+2. **File Tree** — All new/modified files with one-line descriptions
+3. **Walkthrough** — Key code sections explained (not just file dumps)
+4. **End-to-End Flow** — How a user request flows through the system
+5. **Design Decisions** — Non-obvious choices made and why
+6. **Known Gaps / Next Steps** — What is deferred to a later phase
+7. **Awaiting your approval before committing.**
 
 ### Team Work Log
 The file [`docs/07-project-management/team-work-log.md`](docs/07-project-management/team-work-log.md) is **append-only**. Rules:
