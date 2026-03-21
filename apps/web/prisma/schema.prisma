@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  TA
+}
+
+enum CourseRole {
+  INSTRUCTOR
+  TA
+}
+
+enum Semester {
+  SPRING
+  SUMMER
+  FALL
+  WINTER
+}
+
+enum SessionCategory {
+  GRADING
+  OFFICE_HOURS
+  LAB_SUPPORT
+  PREP
+  MEETING
+  OTHER
+}
+
+enum SessionMode {
+  LIVE
+  ASYNC
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  AUTO_STOPPED
+}
+
+enum EventType {
+  START
+  PAUSE
+  RESUME
+  STOP
+  AUTO_STOP
+  SCREENSHOT
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+enum AuditAction {
+  SESSION_START
+  SESSION_STOP
+  SESSION_AUTO_STOP
+  SUBMISSION_SUBMIT
+  SUBMISSION_APPROVE
+  SUBMISSION_REJECT
+  HOURS_EDIT
+  USER_CREATE
+  USER_UPDATE
+  COURSE_CREATE
+  COURSE_UPDATE
+  ASSIGNMENT_CREATE
+  ASSIGNMENT_UPDATE
+  SETTINGS_UPDATE
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(TA)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  assignments CourseAssignment[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model Course {
+  id         String   @id @default(uuid())
+  prefix     String // e.g. "CS"
+  number     String // e.g. "249"
+  title      String // e.g. "Data Structures"
+  semester   Semester
+  year       Int
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  assignments CourseAssignment[]
+
+  @@map("courses")
+}
+
+model CourseAssignment {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  courseId        String    @map("course_id")
+  role           CourseRole
+  maxHoursPerWeek Decimal  @default(20) @map("max_hours_per_week") @db.Decimal(5, 2)
+  hourlyRate     Decimal   @default(0) @map("hourly_rate") @db.Decimal(6, 2)
+  totalBudget    Decimal   @default(0) @map("total_budget") @db.Decimal(10, 2)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user         User               @relation(fields: [userId], references: [id])
+  course       Course             @relation(fields: [courseId], references: [id])
+  workSessions WorkSession[]
+  submissions  WeeklySubmission[]
+
+  @@unique([userId, courseId])
+  @@map("course_assignments")
+}
+
+model WorkSession {
+  id             String          @id @default(uuid())
+  assignmentId   String          @map("assignment_id")
+  category       SessionCategory
+  mode           SessionMode     @default(LIVE)
+  status         SessionStatus   @default(ACTIVE)
+  description    String?
+  startTime      DateTime        @map("start_time")
+  endTime        DateTime?       @map("end_time")
+  totalMinutes   Int             @default(0) @map("total_minutes")
+  pausedMinutes  Int             @default(0) @map("paused_minutes")
+  netMinutes     Int             @default(0) @map("net_minutes")
+  netHours       Decimal         @default(0) @map("net_hours") @db.Decimal(6, 2)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  assignment   CourseAssignment @relation(fields: [assignmentId], references: [id])
+  events       SessionEvent[]
+  screenshots  Screenshot[]
+  photoProofs  PhotoProof[]
+  submission   WeeklySubmission? @relation(fields: [submissionId], references: [id])
+  submissionId String?          @map("submission_id")
+
+  @@map("work_sessions")
+}
+
+model SessionEvent {
+  id        String    @id @default(uuid())
+  sessionId String    @map("session_id")
+  type      EventType
+  timestamp DateTime  @default(now())
+  metadata  String?   // JSON string for additional event data
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  session WorkSession @relation(fields: [sessionId], references: [id])
+
+  @@map("session_events")
+}
+
+model Screenshot {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  s3Key     String   @map("s3_key")
+  s3Bucket  String   @map("s3_bucket")
+  takenAt   DateTime @map("taken_at")
+  fileSize  Int?     @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session WorkSession @relation(fields: [sessionId], references: [id])
+
+  @@map("screenshots")
+}
+
+model PhotoProof {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  s3Key     String   @map("s3_key")
+  s3Bucket  String   @map("s3_bucket")
+  takenAt   DateTime @map("taken_at")
+  fileSize  Int?     @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session WorkSession @relation(fields: [sessionId], references: [id])
+
+  @@map("photo_proofs")
+}
+
+model WeeklySubmission {
+  id           String           @id @default(uuid())
+  assignmentId String           @map("assignment_id")
+  weekStart    DateTime         @map("week_start") @db.Date
+  weekEnd      DateTime         @map("week_end") @db.Date
+  status       SubmissionStatus @default(DRAFT)
+  totalHours   Decimal          @default(0) @map("total_hours") @db.Decimal(6, 2)
+  taNote       String?          @map("ta_note")
+  reviewNote   String?          @map("review_note")
+  submittedAt  DateTime?        @map("submitted_at")
+  reviewedAt   DateTime?        @map("reviewed_at")
+  reviewedBy   String?          @map("reviewed_by")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  assignment  CourseAssignment @relation(fields: [assignmentId], references: [id])
+  sessions    WorkSession[]
+
+  @@unique([assignmentId, weekStart])
+  @@map("weekly_submissions")
+}
+
+model SystemSettings {
+  id                    String   @id @default(uuid())
+  idleTimeoutMinutes    Int      @default(15) @map("idle_timeout_minutes")
+  screenshotIntervalMin Int      @default(5) @map("screenshot_interval_min")
+  maxSessionHours       Int      @default(8) @map("max_session_hours")
+  retentionDays         Int      @default(2555) @map("retention_days")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String?     @map("user_id")
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  metadata   String?     // JSON string for additional audit data
+  ipAddress  String?     @map("ip_address")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
