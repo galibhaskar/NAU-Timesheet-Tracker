@@ -1,10 +1,5 @@
-import { NextResponse } from 'next/server';
+import NextAuth from 'next-auth';
+import { authOptions } from './auth-options';
 
-// TODO: Configure NextAuth with credentials provider
-export async function GET() {
-  return NextResponse.json({ message: 'NextAuth endpoint — not yet configured' });
-}
-
-export async function POST() {
-  return NextResponse.json({ message: 'NextAuth endpoint — not yet configured' });
-}
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
