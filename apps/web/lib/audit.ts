@@ -1,12 +1,13 @@
 import { prisma } from './prisma';
 import type { AuditAction } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 interface AuditParams {
   userId: string;
   action: AuditAction;
   entityType: string;
   entityId: string;
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown> | null;
   ipAddress?: string;
 }
 
@@ -17,7 +18,7 @@ export async function createAuditLog(params: AuditParams): Promise<void> {
       action: params.action,
       entityType: params.entityType,
       entityId: params.entityId,
-      details: params.details ?? {},
+      details: (params.details as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull,
       ipAddress: params.ipAddress ?? null,
     },
   });

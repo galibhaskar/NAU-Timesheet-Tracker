@@ -25,13 +25,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
       where: {
         userId,
         role: 'TA',
-        isActive: true,
         course: {
           assignments: {
             some: {
               userId: ctx.userId,
               role: 'INSTRUCTOR',
-              isActive: true,
             },
           },
         },
@@ -47,7 +45,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   // Confirm target user exists and is a TA
   const targetUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, isActive: true },
+    select: { id: true, name: true, email: true, role: true },
   });
 
   if (!targetUser) return errors.notFound('User not found');
@@ -64,24 +62,22 @@ export async function GET(req: NextRequest, context: RouteContext) {
     where: {
       userId,
       role: 'TA',
-      isActive: true,
     },
     include: {
       course: {
         select: {
           id: true,
-          prefix: true,
-          number: true,
-          title: true,
+          code: true,
+          name: true,
           semester: true,
           year: true,
         },
       },
-      workSessions: {
+      sessions: {
         where: {
-          startTime: { gte: weekStart, lte: weekEnd },
+          startedAt: { gte: weekStart, lte: weekEnd },
         },
-        select: { netHours: true, netMinutes: true },
+        select: { netHours: true },
       },
     },
   });
@@ -89,16 +85,17 @@ export async function GET(req: NextRequest, context: RouteContext) {
   let totalWeeklyHours = 0;
 
   const perCourse = assignments.map((a) => {
-    const courseMinutes = a.workSessions.reduce((sum, s) => sum + s.netMinutes, 0);
-    const courseHours = Math.round((courseMinutes / 60) * 100) / 100;
+    const courseHours = Math.round(
+      a.sessions.reduce((sum, s) => sum + Number(s.netHours), 0) * 100
+    ) / 100;
     totalWeeklyHours += courseHours;
 
     return {
       assignmentId: a.id,
       courseId: a.course.id,
-      courseName: `${a.course.prefix} ${a.course.number} - ${a.course.title}`,
+      courseName: `${a.course.code} - ${a.course.name}`,
       course: a.course,
-      maxHoursPerWeek: Number(a.maxHoursPerWeek),
+      maxWeeklyHours: a.maxWeeklyHours !== null ? Number(a.maxWeeklyHours) : null,
       hoursThisWeek: courseHours,
     };
   });

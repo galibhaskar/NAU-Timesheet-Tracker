@@ -61,7 +61,7 @@ export async function POST(
   // Preserve rejection reason in audit log before it gets overwritten on resubmit
   await createAuditLog({
     userId: ctx.userId,
-    action: 'SUBMISSION_REJECT',
+    action: 'REJECTED',
     entityType: 'WeeklySubmission',
     entityId: params.id,
     details: {

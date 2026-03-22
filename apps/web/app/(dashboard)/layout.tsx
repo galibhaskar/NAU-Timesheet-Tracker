@@ -1,19 +1,41 @@
-export default function DashboardLayout({
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/auth-options';
+import { Sidebar } from '@/components/layout/sidebar';
+import { Header } from '@/components/layout/header';
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect('/login');
+  }
+
+  const user = session.user as {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-nau-navy text-white">
-        <div className="p-4">
-          <h2 className="text-lg font-bold text-nau-gold">NAU Timesheet</h2>
-        </div>
-        <nav className="mt-4">
-          <p className="px-4 text-sm text-gray-400">Navigation — coming soon</p>
-        </nav>
-      </aside>
-      <main className="flex-1 bg-gray-50 p-8">{children}</main>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* Sidebar — purely presentational, rendered server-side, client child handles active link */}
+      <Sidebar role={user.role} />
+
+      {/* Main content area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Header
+          userName={user.name ?? 'User'}
+          userEmail={user.email ?? ''}
+          role={user.role}
+        />
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      </div>
     </div>
   );
 }

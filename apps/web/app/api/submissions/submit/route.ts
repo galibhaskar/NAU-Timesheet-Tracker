@@ -4,7 +4,7 @@ import { errors } from '@/lib/api-error';
 import { getAuthContext, requireRole } from '@/lib/middleware/rbac';
 import { parseBody, SubmitWeekSchema } from '@/lib/validators';
 import { createAuditLog, getClientIp } from '@/lib/audit';
-import { getWeekStart, getWeekEnd } from '@/lib/dates';
+import { getWeekStart, getWeekEnd, parsePhoenixDate } from '@/lib/dates';
 import { getRejectionCount, MAX_REJECTION_CYCLES } from '@/lib/services/submission-service';
 
 export async function POST(req: NextRequest) {
@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   if (assignment.userId !== ctx.userId) return errors.forbidden();
   if (assignment.role !== 'TA') return errors.forbidden('Only TAs can submit');
 
-  const weekStart = getWeekStart(new Date(data.weekStart));
+  // Interpret YYYY-MM-DD input as midnight Phoenix time, then get the canonical week start
+  const weekStart = getWeekStart(parsePhoenixDate(data.weekStart));
   const weekEnd = getWeekEnd(weekStart);
 
   // Check for in-progress sessions this week
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'SUBMISSION_SUBMIT',
+    action: 'SUBMITTED',
     entityType: 'WeeklySubmission',
     entityId: submission.id,
     details: { totalHours, sessionCount: completedSessions.length, weekStart: weekStart.toISOString() },

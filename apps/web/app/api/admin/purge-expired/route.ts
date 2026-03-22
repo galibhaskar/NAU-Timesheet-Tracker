@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { errors } from '@/lib/api-error';
 import { getAuthContext, requireRole } from '@/lib/middleware/rbac';
 import { createAuditLog, getClientIp } from '@/lib/audit';
-import { deleteFile } from '@/lib/storage';
+import { deleteFile, BUCKETS } from '@/lib/storage';
 
 const DEFAULT_PROOF_RETENTION_DAYS = 30;
 const ABANDONED_SUBMISSION_DAYS = 90;
@@ -43,23 +43,23 @@ export async function POST(req: NextRequest) {
     },
     include: {
       screenshots: true,
-      photoProofs: true,
+      photos: true,
     },
   });
 
   for (const session of approvedSessions) {
     for (const shot of session.screenshots) {
       try {
-        await deleteFile(shot.s3Bucket, shot.s3Key);
+        await deleteFile(BUCKETS.screenshots, shot.fileUrl);
         await prisma.screenshot.delete({ where: { id: shot.id } });
         purgedScreenshots++;
       } catch (err) {
         errors_.push(`Screenshot ${shot.id}: ${String(err)}`);
       }
     }
-    for (const photo of session.photoProofs) {
+    for (const photo of session.photos) {
       try {
-        await deleteFile(photo.s3Bucket, photo.s3Key);
+        await deleteFile(BUCKETS.photos, photo.fileUrl);
         await prisma.photoProof.delete({ where: { id: photo.id } });
         purgedPhotos++;
       } catch (err) {
@@ -73,28 +73,28 @@ export async function POST(req: NextRequest) {
     where: {
       submission: {
         status: { in: ['DRAFT', 'REJECTED'] },
-        createdAt: { lte: abandonedCutoff },
+        weekStart: { lte: abandonedCutoff },
       },
     },
     include: {
       screenshots: true,
-      photoProofs: true,
+      photos: true,
     },
   });
 
   for (const session of abandonedSessions) {
     for (const shot of session.screenshots) {
       try {
-        await deleteFile(shot.s3Bucket, shot.s3Key);
+        await deleteFile(BUCKETS.screenshots, shot.fileUrl);
         await prisma.screenshot.delete({ where: { id: shot.id } });
         purgedScreenshots++;
       } catch (err) {
         errors_.push(`Screenshot ${shot.id}: ${String(err)}`);
       }
     }
-    for (const photo of session.photoProofs) {
+    for (const photo of session.photos) {
       try {
-        await deleteFile(photo.s3Bucket, photo.s3Key);
+        await deleteFile(BUCKETS.photos, photo.fileUrl);
         await prisma.photoProof.delete({ where: { id: photo.id } });
         purgedPhotos++;
       } catch (err) {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'HOURS_EDIT', // closest available AuditAction for purge operations
+    action: 'PROOF_PURGED',
     entityType: 'Proof',
     entityId: ctx.userId,
     details: {

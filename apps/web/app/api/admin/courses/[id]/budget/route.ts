@@ -21,9 +21,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
     where: { id },
     select: {
       id: true,
-      prefix: true,
-      number: true,
-      title: true,
+      code: true,
+      name: true,
       enrolledStudents: true,
       hoursPerStudent: true,
       overrideWeeklyBudget: true,
@@ -36,7 +35,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   return NextResponse.json({
     courseId: course.id,
-    courseName: `${course.prefix} ${course.number} - ${course.title}`,
+    courseName: `${course.code} - ${course.name}`,
     enrolledStudents: course.enrolledStudents,
     hoursPerStudent: Number(course.hoursPerStudent),
     overrideWeeklyBudget: course.overrideWeeklyBudget !== null
@@ -59,8 +58,8 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     where: { id },
     select: {
       id: true,
-      prefix: true,
-      number: true,
+      code: true,
+      name: true,
       enrolledStudents: true,
       hoursPerStudent: true,
       overrideWeeklyBudget: true,
@@ -89,9 +88,8 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     },
     select: {
       id: true,
-      prefix: true,
-      number: true,
-      title: true,
+      code: true,
+      name: true,
       enrolledStudents: true,
       hoursPerStudent: true,
       overrideWeeklyBudget: true,
@@ -102,7 +100,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'COURSE_UPDATE',
+    action: 'BUDGET_CHANGED',
     entityType: 'Course',
     entityId: id,
     details: {
@@ -115,7 +113,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
   return NextResponse.json({
     courseId: updated.id,
-    courseName: `${updated.prefix} ${updated.number} - ${updated.title}`,
+    courseName: `${updated.code} - ${updated.name}`,
     enrolledStudents: updated.enrolledStudents,
     hoursPerStudent: Number(updated.hoursPerStudent),
     overrideWeeklyBudget: updated.overrideWeeklyBudget !== null

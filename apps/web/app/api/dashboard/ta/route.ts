@@ -1,109 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { errors } from '@/lib/api-error';
 import { getAuthContext, requireRole } from '@/lib/middleware/rbac';
 import { getWeekStart, getWeekEnd } from '@/lib/dates';
+import { getWeeklyBudget } from '@/lib/services/budget';
 
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext(req);
   const roleError = requireRole(ctx, 'TA');
   if (roleError) return roleError;
-  if (!ctx) return roleError;
+  if (!ctx) return errors.unauthorized();
 
   const now = new Date();
   const weekStart = getWeekStart(now);
   const weekEnd = getWeekEnd(weekStart);
-
-  // Four weeks back for recent submissions
   const fourWeeksAgo = new Date(weekStart.getTime() - 28 * 24 * 60 * 60 * 1000);
 
-  // Load all active course assignments for this TA
+  // Load all TA course assignments with this week's sessions
   const assignments = await prisma.courseAssignment.findMany({
-    where: {
-      userId: ctx.userId,
-      isActive: true,
-      role: 'TA',
-    },
+    where: { userId: ctx.userId, role: 'TA' },
     include: {
       course: {
-        select: {
-          id: true,
-          prefix: true,
-          number: true,
-          title: true,
-          semester: true,
-          year: true,
-          isActive: true,
-        },
+        select: { id: true, name: true, code: true, semester: true, year: true, enrolledStudents: true, hoursPerStudent: true, overrideWeeklyBudget: true },
       },
-      workSessions: {
-        where: {
-          startTime: { gte: weekStart, lte: weekEnd },
-          status: { not: 'AUTO_STOPPED' },
-        },
-        select: {
-          id: true,
-          category: true,
-          mode: true,
-          status: true,
-          description: true,
-          startTime: true,
-          endTime: true,
-          netMinutes: true,
-          netHours: true,
-        },
-        orderBy: { startTime: 'asc' },
-      },
-      submissions: {
-        where: {
-          weekStart: { gte: weekStart },
-          status: 'DRAFT',
-        },
-        select: {
-          id: true,
-          weekStart: true,
-          weekEnd: true,
-          status: true,
-          totalHours: true,
-          taNote: true,
-        },
-        take: 1,
+      sessions: {
+        where: { startedAt: { gte: weekStart, lte: weekEnd } },
+        select: { id: true, category: true, mode: true, status: true, description: true, startedAt: true, endedAt: true, activeMinutes: true, netHours: true },
+        orderBy: { startedAt: 'asc' },
       },
     },
   });
 
-  // Group sessions by category for each assignment
   const assignmentData = assignments.map((a) => {
-    const sessionsByCategory: Record<string, typeof a.workSessions> = {};
-    for (const session of a.workSessions) {
-      const cat = session.category;
-      if (!sessionsByCategory[cat]) sessionsByCategory[cat] = [];
-      sessionsByCategory[cat].push(session);
-    }
-
-    const totalWeekMinutes = a.workSessions.reduce((sum, s) => sum + s.netMinutes, 0);
+    const weeklyBudget = getWeeklyBudget(a.course);
+    const totalHours = a.sessions.reduce((sum, s) => sum + Number(s.netHours), 0);
 
     return {
       assignmentId: a.id,
-      maxHoursPerWeek: Number(a.maxHoursPerWeek),
-      course: a.course,
+      maxWeeklyHours: a.maxWeeklyHours !== null ? Number(a.maxWeeklyHours) : weeklyBudget,
+      course: { id: a.course.id, name: a.course.name, code: a.course.code, semester: a.course.semester, year: a.course.year },
       thisWeek: {
         weekStart: weekStart.toISOString(),
         weekEnd: weekEnd.toISOString(),
-        sessions: a.workSessions,
-        sessionsByCategory,
-        totalHours: Math.round((totalWeekMinutes / 60) * 100) / 100,
+        sessions: a.sessions.map((s) => ({
+          id: s.id,
+          category: s.category,
+          mode: s.mode,
+          status: s.status,
+          description: s.description,
+          startedAt: s.startedAt.toISOString(),
+          endedAt: s.endedAt?.toISOString() ?? null,
+          activeMinutes: s.activeMinutes,
+          netHours: Number(s.netHours),
+        })),
+        totalHours: Math.round(totalHours * 100) / 100,
       },
-      draftSubmission: a.submissions[0] ?? null,
     };
   });
 
-  // Recent submissions across all assignments (last 4 weeks)
+  // Recent submissions (last 4 weeks, excluding DRAFT)
   const recentSubmissions = await prisma.weeklySubmission.findMany({
     where: {
-      assignment: {
-        userId: ctx.userId,
-        isActive: true,
-      },
+      assignment: { userId: ctx.userId },
       weekStart: { gte: fourWeeksAgo },
       status: { not: 'DRAFT' },
     },
@@ -115,13 +73,9 @@ export async function GET(req: NextRequest) {
       totalHours: true,
       submittedAt: true,
       reviewedAt: true,
-      reviewNote: true,
+      rejectionReason: true,
       assignment: {
-        select: {
-          course: {
-            select: { id: true, prefix: true, number: true, title: true },
-          },
-        },
+        select: { course: { select: { id: true, name: true, code: true } } },
       },
     },
     orderBy: { weekStart: 'desc' },
@@ -133,13 +87,13 @@ export async function GET(req: NextRequest) {
     assignments: assignmentData,
     recentSubmissions: recentSubmissions.map((s) => ({
       id: s.id,
-      weekStart: s.weekStart,
-      weekEnd: s.weekEnd,
+      weekStart: s.weekStart.toISOString(),
+      weekEnd: s.weekEnd.toISOString(),
       status: s.status,
       totalHours: Number(s.totalHours),
-      submittedAt: s.submittedAt,
-      reviewedAt: s.reviewedAt,
-      reviewNote: s.reviewNote,
+      submittedAt: s.submittedAt?.toISOString() ?? null,
+      reviewedAt: s.reviewedAt?.toISOString() ?? null,
+      rejectionReason: s.rejectionReason,
       course: s.assignment.course,
     })),
   });

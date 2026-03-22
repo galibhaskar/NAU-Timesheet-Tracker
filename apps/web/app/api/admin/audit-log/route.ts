@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { errors } from '@/lib/api-error';
 import { getAuthContext, requireRole } from '@/lib/middleware/rbac';
@@ -19,11 +20,13 @@ export async function GET(req: NextRequest) {
   const { data, error } = parseBody(AuditLogQuerySchema, raw);
   if (error) return error;
 
-  const { page, limit, action, userId, entityType, entityId, from, to } = data;
+  const page = data.page ?? 1;
+  const limit = data.limit ?? 50;
+  const { action, userId, entityType, entityId, from, to } = data;
   const skip = (page - 1) * limit;
 
   // Build the where clause
-  const where: Parameters<typeof prisma.auditLog.findMany>[0]['where'] = {};
+  const where: Prisma.AuditLogWhereInput = {};
 
   if (action) {
     // Map the spec's action names to the Prisma AuditAction enum values used in schema
@@ -78,7 +81,7 @@ export async function GET(req: NextRequest) {
     action: entry.action,
     entityType: entry.entityType,
     entityId: entry.entityId,
-    metadata: entry.metadata ? JSON.parse(entry.metadata) : null,
+    details: entry.details ?? null,
     ipAddress: entry.ipAddress,
     createdAt: entry.createdAt,
     user: entry.user

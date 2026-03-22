@@ -4,6 +4,7 @@ import { errors } from '@/lib/api-error';
 import { getAuthContext, requireRole } from '@/lib/middleware/rbac';
 import { createAuditLog, getClientIp } from '@/lib/audit';
 import { canTransition } from '@/lib/services/submission-service';
+import { getWeeklyBudget } from '@/lib/services/budget';
 
 export async function POST(
   req: NextRequest,
@@ -56,13 +57,11 @@ export async function POST(
   });
   const alreadyApprovedHours = Number(approvedHoursResult._sum.totalHours ?? 0);
   const projectedTotal = alreadyApprovedHours + Number(submission.totalHours);
-  const totalBudget = Number(submission.assignment.totalBudget);
-  const hourlyRate = Number(submission.assignment.hourlyRate);
-  const budgetHours = hourlyRate > 0 ? totalBudget / hourlyRate : null;
+  const weeklyBudget = getWeeklyBudget(submission.assignment.course);
 
   let budgetWarning: string | null = null;
-  if (budgetHours !== null && projectedTotal > budgetHours) {
-    budgetWarning = `Approving this submission would bring total approved hours to ${projectedTotal.toFixed(2)}, exceeding the budget of ${budgetHours.toFixed(2)} hours.`;
+  if (projectedTotal > weeklyBudget) {
+    budgetWarning = `Approving this submission would bring total approved hours to ${projectedTotal.toFixed(2)}, exceeding the budget of ${weeklyBudget.toFixed(2)} hours.`;
   }
 
   const now = new Date();
@@ -77,7 +76,7 @@ export async function POST(
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'SUBMISSION_APPROVE',
+    action: 'APPROVED',
     entityType: 'WeeklySubmission',
     entityId: params.id,
     details: {

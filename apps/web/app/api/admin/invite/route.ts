@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
   if (data.courseId) {
     const course = await prisma.course.findUnique({
       where: { id: data.courseId },
-      select: { prefix: true, number: true, title: true },
+      select: { code: true, name: true },
     });
     if (!course) return errors.notFound('Course not found');
-    courseName = `${course.prefix} ${course.number} - ${course.title}`;
+    courseName = `${course.code} - ${course.name}`;
   }
 
   // Generate invite token with 7-day expiry
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'USER_CREATE',
+    action: 'USER_INVITED',
     entityType: 'Invite',
     entityId: token,
     details: {

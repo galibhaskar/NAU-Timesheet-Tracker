@@ -53,10 +53,11 @@ export async function POST(
 
   await uploadFile(BUCKETS.photos, fileKey, buffer, file.type);
 
-  const photo = await prisma.photo.create({
+  const photo = await prisma.photoProof.create({
     data: {
       sessionId: params.id,
-      capturedAt: uploadedAt,
+      fileName: filename,
+      uploadedAt,
       fileUrl: fileKey,
       fileSize: file.size,
       caption,

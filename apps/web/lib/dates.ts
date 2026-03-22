@@ -25,6 +25,11 @@ export function formatPhoenix(date: Date, fmt: string): string {
   return format(toZonedTime(date, NAU_TIMEZONE), fmt, { timeZone: NAU_TIMEZONE });
 }
 
+/** Parse a YYYY-MM-DD date string as midnight in Phoenix timezone → UTC Date */
+export function parsePhoenixDate(dateStr: string): Date {
+  return fromZonedTime(new Date(`${dateStr}T00:00:00`), NAU_TIMEZONE);
+}
+
 /** Check if a timestamp drift exceeds 30 seconds */
 export function hasDrift(serverTs: Date, clientTs: Date | null): boolean {
   if (!clientTs) return false;

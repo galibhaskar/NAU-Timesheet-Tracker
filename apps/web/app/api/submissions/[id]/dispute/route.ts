@@ -46,7 +46,7 @@ export async function POST(
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'SUBMISSION_DISPUTE',
+    action: 'DISPUTE_HOLD_TOGGLED',
     entityType: 'WeeklySubmission',
     entityId: params.id,
     details: {

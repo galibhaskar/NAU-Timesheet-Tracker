@@ -62,7 +62,6 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       name: data.name,
       role: invite.role,
-      isActive: true,
     },
     select: { id: true, email: true, name: true, role: true },
   });
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
 
   await createAuditLog({
     userId: user.id,
-    action: 'USER_CREATE',
+    action: 'USER_INVITED',
     entityType: 'User',
     entityId: user.id,
     details: {

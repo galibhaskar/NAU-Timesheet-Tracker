@@ -83,7 +83,7 @@ export async function PUT(req: NextRequest) {
 
     await createAuditLog({
       userId: ctx.userId,
-      action: 'SETTINGS_UPDATE',
+      action: 'SETTINGS_CHANGED',
       entityType: 'SystemSettings',
       entityId: key,
       details: { key, oldValue, newValue: String(value) },

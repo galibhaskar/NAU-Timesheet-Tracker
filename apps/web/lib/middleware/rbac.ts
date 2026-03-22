@@ -20,13 +20,19 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext | nu
     return verifyJwt(token);
   }
   // Fall back to NextAuth session (web dashboard)
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  return {
-    userId: session.user.id as string,
-    email: session.user.email as string,
-    role: session.user.role as Role,
-  };
+  // Wrapped in try-catch: getServerSession calls headers() which throws outside a Next.js
+  // request context (e.g., in Jest integration tests). Treat that as unauthenticated.
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return null;
+    return {
+      userId: session.user.id as string,
+      email: session.user.email as string,
+      role: session.user.role as Role,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Verify JWT from Electron app. Returns null if invalid. */

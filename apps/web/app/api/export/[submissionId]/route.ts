@@ -97,7 +97,7 @@ export async function GET(
 
   // Generate CSV
   const course = submission.assignment.course;
-  const courseLabel = `${course.prefix} ${course.number}`;
+  const courseLabel = `${course.code}`;
   const weekLabel = formatPhoenix(submission.weekStart, 'yyyy-MM-dd');
 
   const csvLines: string[] = [
@@ -140,7 +140,7 @@ export async function GET(
 
   await createAuditLog({
     userId: ctx.userId,
-    action: 'SUBMISSION_EXPORT',
+    action: 'EXPORTED',
     entityType: 'WeeklySubmission',
     entityId: params.submissionId,
     details: {
