@@ -1,0 +1,17 @@
+appId: edu.nau.timesheet
+productName: NAU Timesheet
+directories:
+  output: dist
+files:
+  - out/**/*
+  - resources/**/*
+mac:
+  target: dmg
+  category: public.app-category.productivity
+win:
+  target: nsis
+  icon: resources/icon.png
+publish:
+  provider: github
+  owner: galibhaskar
+  repo: NAU-Timesheet-Tracker
